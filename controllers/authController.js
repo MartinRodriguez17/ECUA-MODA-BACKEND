@@ -9,14 +9,14 @@ const bcrypt = require("bcryptjs");
 // 1. Importamos la librería para los Pases VIP
 const jwt = require("jsonwebtoken");
 // Importamos el modelo de Otp para manejar los códigos de verificación por correo
-const Otp = require("../models/Otp"); 
+const Otp = require("../models/Otp");
 // Importamos la función para enviar correos (si es que la usaremos aquí)
 const { enviarCorreoOTP } = require("../utils/emailService");
 
 // --- NUEVO: Generar OTP para Clientes Normales ---
 exports.generarOtpUsuario = async (req, res) => {
   try {
-    const email = req.body.email?.trim().toLowerCase(); 
+    const email = req.body.email?.trim().toLowerCase();
     const nombre = req.body.nombre?.trim(); // Recibimos el nombre/username de Flutter
 
     if (!email) return res.status(400).json({ msg: "Falta el correo bro" });
@@ -36,8 +36,8 @@ exports.generarOtpUsuario = async (req, res) => {
     }
 
     const codigoGenerado = Math.floor(100000 + Math.random() * 900000).toString();
-    
-    await Otp.deleteMany({ correo: email }); 
+
+    await Otp.deleteMany({ correo: email });
     const nuevoOtp = new Otp({ correo: email, codigo: codigoGenerado });
     await nuevoOtp.save();
 
@@ -79,7 +79,7 @@ exports.registrarUsuario = async (req, res) => {
     // --- EL NUEVO ESCUDO OTP ---
     // Buscamos si el código coincide con el correo en la base de datos
     const otpGuardado = await Otp.findOne({ correo: email.toLowerCase(), codigo: codigoOtp });
-    
+
     if (!otpGuardado) {
       return res.status(400).json({ msg: "Código incorrecto o ya expiró (duraba 5 min) ⏳" });
     }
@@ -142,10 +142,10 @@ exports.loginUsuario = async (req, res) => {
 
   try {
     let esMarca = false;
-    
+
     // --- EL PARCHE MÁGICO ---
     // Convertimos lo que escriba el usuario a minúsculas antes de buscar
-    const correoNormalizado = email.toLowerCase(); 
+    const correoNormalizado = email.toLowerCase();
 
     // 1. Buscamos primero en la colección de clientes normales usando el correo en minúsculas
     let usuario = await Usuario.findOne({ email: correoNormalizado });
@@ -205,11 +205,11 @@ exports.obtenerPerfilUsuario = async (req, res) => {
     // El middleware de autenticación (auth.js) ya nos dejó el ID seguro en req.usuario.id
     // El .select('-password') es vital para que la contraseña encriptada no viaje al frontend
     const usuario = await Usuario.findById(req.usuario.id).select('-password');
-    
+
     if (!usuario) {
       return res.status(404).json({ msg: "Usuario no encontrado bro" });
     }
-    
+
     res.json(usuario);
   } catch (error) {
     console.error("Error al obtener perfil:", error);
@@ -217,41 +217,94 @@ exports.obtenerPerfilUsuario = async (req, res) => {
   }
 };
 
-// --- NUEVA FUNCIÓN: ACTUALIZAR PERFIL (NOMBRE Y FOTO) ---
-exports.actualizarPerfil = async (req, res) => {s
+// --- OBTENER PERFIL ---
+exports.obtenerPerfilUsuario = async (req, res) => {
   try {
-    const { nombre } = req.body;
-    const actualizaciones = {};
+    const id = req.usuario.id;
+    const rol = req.usuario.rol;
 
-    // 1. Si el usuario mandó un nombre nuevo, lo preparamos para actualizar
-    if (nombre) {
-      // Opcional: Verificar que el nuevo nombre no esté tomado por otro (como hicimos en el registro)
-      const usernameRepetido = await Usuario.findOne({ nombre: new RegExp(`^${nombre}$`, 'i'), _id: { $ne: req.usuario.id } });
-      if (usernameRepetido) {
-        return res.status(400).json({ msg: "Ese nombre ya está en uso bro 🛑" });
-      }
-      actualizaciones.nombre = nombre;
+    if (rol === 'marca') {
+      const marca = await Marca.findById(id).select('-password');
+      if (!marca) return res.status(404).json({ msg: 'Usuario no encontrado bro' });
+
+      return res.json({
+        _id: marca._id,
+        nombre: marca.nombreMarca || marca.nombre,
+        email: marca.correo || marca.email,
+        rol: 'marca',
+        fotoUrl: marca.fotoUrl || '',
+      });
     }
 
-    // 2. Si Multer atrapó una foto nueva, guardamos el link de Cloudinary
+    const usuario = await Usuario.findById(id).select('-password');
+    if (!usuario) return res.status(404).json({ msg: 'Usuario no encontrado bro' });
+
+    res.json(usuario);
+
+  } catch (error) {
+    console.error('Error al obtener perfil:', error);
+    res.status(500).send('Hubo un error en el servidor al buscar tu perfil');
+  }
+};
+
+// --- ACTUALIZAR PERFIL ---
+exports.actualizarPerfil = async (req, res) => {
+  try {
+    const { nombre } = req.body;
+    const rol = req.usuario.rol;
+    const actualizaciones = {};
+
     if (req.file) {
       actualizaciones.fotoUrl = req.file.path;
     }
 
-    // 3. Actualizamos en MongoDB y devolvemos el usuario actualizado (sin la contraseña)
+    if (rol === 'marca') {
+      // Para marcas actualizamos en la colección Marca
+      if (nombre) actualizaciones.nombreMarca = nombre; // ajusta al campo correcto
+
+      const marcaActualizada = await Marca.findByIdAndUpdate(
+        req.usuario.id,
+        { $set: actualizaciones },
+        { new: true }
+      ).select('-password');
+
+      return res.json({
+        msg: '¡Perfil actualizado con éxito! 🔥',
+        usuario: {
+          _id: marcaActualizada._id,
+          nombre: marcaActualizada.nombreMarca || marcaActualizada.nombre,
+          email: marcaActualizada.correo || marcaActualizada.email,
+          rol: 'marca',
+          fotoUrl: marcaActualizada.fotoUrl || '',
+        }
+      });
+    }
+
+    // Para usuarios normales
+    if (nombre) {
+      const usernameRepetido = await Usuario.findOne({
+        nombre: new RegExp(`^${nombre}$`, 'i'),
+        _id: { $ne: req.usuario.id }
+      });
+      if (usernameRepetido) {
+        return res.status(400).json({ msg: 'Ese nombre ya está en uso bro 🛑' });
+      }
+      actualizaciones.nombre = nombre;
+    }
+
     const usuarioActualizado = await Usuario.findByIdAndUpdate(
       req.usuario.id,
       { $set: actualizaciones },
-      { new: true } // Esto le dice a Mongo que devuelva el documento YA modificado
+      { new: true }
     ).select('-password');
 
-    res.json({ msg: "¡Perfil actualizado con éxito! 🔥", usuario: usuarioActualizado });
+    res.json({ msg: '¡Perfil actualizado con éxito! 🔥', usuario: usuarioActualizado });
+
   } catch (error) {
-    console.error("Error al actualizar perfil:", error);
-    res.status(500).json({ msg: "Hubo un error al guardar tus cambios bro" });
+    console.error('Error al actualizar perfil:', error);
+    res.status(500).json({ msg: 'Hubo un error al guardar tus cambios bro' });
   }
 };
-
 // --- RECUPERACIÓN DE CONTRASEÑA: PASO 1 - Enviar código ---
 exports.generarOtpRecuperacion = async (req, res) => {
   try {

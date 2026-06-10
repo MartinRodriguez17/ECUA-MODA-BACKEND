@@ -36,6 +36,10 @@ const MarcaSchema = mongoose.Schema({
     type: String,
     required: true,
   },
+  fotoUrl: {                    // 👈 NUEVO
+    type: String,
+    default: '',
+  },
   estadoAprobacion: {
     type: String,
     default: "Pendiente", // Cuando te mandan la solicitud, nace como Pendiente

@@ -7,34 +7,29 @@ const Marca = require("../models/Marca");
 // Función para agregar un producto nuevo
 exports.crearProducto = async (req, res) => {
   try {
-    // 1. Buscamos a la Marca que está subiendo la ropa (usando su token)
-    const Usuario = require('../models/Usuario');
-    const marcaLogueada = await Usuario.findById(req.usuario.id);
+    const marcaLogueada = await Marca.findById(req.usuario.id); // 👈 Marca, no Usuario
 
     if (!marcaLogueada) {
-      return res.status(404).json({ msg: 'No se encontró tu usuario de marca bro' });
+      return res.status(404).json({ msg: 'No se encontró tu marca bro' });
     }
 
-    // 2. Extraemos los datos que mandó Flutter en el formulario
     const datosProducto = { ...req.body };
 
-    // 3. Magia pura: Atrapamos la foto de Cloudinary
-    if (req.file) {
-      datosProducto.imagenes = [req.file.path];
+    // Ahora atrapamos múltiples fotos
+    if (req.files && req.files.length > 0) {
+      datosProducto.imagenes = req.files.map(file => file.path); // 👈 array de URLs
     }
 
-    // 4. Inyectamos la firma inborrable de la marca
-    datosProducto.marcaNombre = marcaLogueada.nombre;
+    datosProducto.marcaNombre = marcaLogueada.nombreMarca;
     datosProducto.marcaId = marcaLogueada._id;
 
-    // 5. Guardamos en MongoDB
     let producto = new Producto(datosProducto);
     await producto.save();
 
     res.status(201).json(producto);
   } catch (error) {
-    console.log("Error al crear producto:", error);
-    res.status(500).json({ msg: "Hubo un error en el servidor al subir la prenda" });
+    console.log('Error al crear producto:', error);
+    res.status(500).json({ msg: 'Hubo un error en el servidor al subir la prenda' });
   }
 };
 
@@ -71,23 +66,33 @@ exports.obtenerProductos = async (req, res) => {
 // Función para actualizar un producto
 exports.actualizarProducto = async (req, res) => {
   try {
-    // Primero buscamos si el producto existe usando el ID que viene en la URL
     let producto = await Producto.findById(req.params.id);
-
     if (!producto) {
-      return res.status(404).json({ msg: "No existe el producto bro" });
+      return res.status(404).json({ msg: 'No existe el producto bro' });
     }
 
-    // Si sí existe, lo actualizamos con los datos nuevos que vengan en req.body
-    // El { new: true } es clave para que Mongoose te devuelva el producto YA actualizado
-    producto = await Producto.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-    });
+    const actualizaciones = { ...req.body };
+
+    // Convertimos las tallas de string "S,M,L" a array ["S","M","L"]
+    if (req.body.tallas && typeof req.body.tallas === 'string') {
+      actualizaciones.tallas = req.body.tallas.split(',').filter(t => t.trim() !== '');
+    }
+
+    // Si mandaron imágenes nuevas las actualizamos, si no conservamos las existentes
+    if (req.files && req.files.length > 0) {
+      actualizaciones.imagenes = req.files.map(file => file.path);
+    }
+
+    producto = await Producto.findByIdAndUpdate(
+      req.params.id,
+      actualizaciones,
+      { new: true }
+    );
 
     res.json(producto);
   } catch (error) {
-    console.log("Error al actualizar producto:", error);
-    res.status(500).send("Hubo un error al actualizar la mercadería bro");
+    console.log('Error al actualizar producto:', error);
+    res.status(500).send('Hubo un error al actualizar la mercadería bro');
   }
 };
 
@@ -126,5 +131,15 @@ exports.obtenerMarcas = async (req, res) => {
     }
 }
 
+// Función para obtener solo los productos del usuario que está logueado
+exports.obtenerMisProductos = async (req, res) => {
+  try {
+    const productos = await Producto.find({ marcaId: req.usuario.id });
+    res.json(productos);
+  } catch (error) {
+    console.log('Error:', error);
+    res.status(500).send('Error al obtener tus productos bro');
+  }
+};
 // esto se hace para que los del frontend puedan usar estas funciones 
 // cuando hagan peticiones a las rutas que definimos en productoRoutes.js

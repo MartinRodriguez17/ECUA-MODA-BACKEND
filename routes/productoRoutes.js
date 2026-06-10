@@ -18,16 +18,19 @@ router.get('/marcas', productoController.obtenerMarcas);
 
 // 2. Le metemos el middleware upload.single('imagen')
 // Esto le dice que espere UN solo archivo y que ese archivo vendrá en un campo llamado 'imagen'
-router.post('/', auth.verificarTokenYRol, upload.single('imagen'), productoController.crearProducto);
+router.post('/', auth.verificarToken, upload.array('imagenes', 4), productoController.crearProducto);
 // Ruta: POST /api/productos
 
 // READ: Obtener todos los productos
 router.get('/', productoController.obtenerProductos);
 
 // UPDATE: Actualizar un producto específico (necesitamos su ID)
-router.put('/:id',validarMongoId, auth.verificarTokenYRol, productoController.actualizarProducto);
+router.put('/:id', auth.verificarToken, upload.array('imagenes', 4), productoController.actualizarProducto);
 
 // DELETE: Eliminar un producto específico (necesitamos su ID)
 router.delete('/:id', validarMongoId, auth.verificarTokenYRol, productoController.eliminarProducto);
+
+// Ruta para obtener solo los productos del usuario que está logueado
+router.get('/mis-productos', auth.verificarToken, productoController.obtenerMisProductos);
 
 module.exports = router;
