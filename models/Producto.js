@@ -15,11 +15,11 @@ const productoSchema = new mongoose.Schema(
     marcaNombre: {
       type: String,
       required: true,
-      default: 'Hub Moda' 
+      default: 'Hub Moda'
     },
     marcaId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Usuario' 
+      ref: 'Usuario'
     },
     precio: {
       type: Number,
@@ -36,22 +36,25 @@ const productoSchema = new mongoose.Schema(
     },
     tallas: [
       {
-        type: String,
-        enum: ["XS", "S", "M", "L", "XL", "XXL"],
-      },
+        talla: {
+          type: String,
+          enum: ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
+          required: true,
+        },
+        stock: {
+          type: Number,
+          default: 0,
+        }
+      }
     ],
-    stock: {
-      type: Number,
-      default: 0,
-    },
     imagenes: [
       {
-        type: String, 
+        type: String,
       },
     ],
   },
   {
-    timestamps: true, 
+    timestamps: true,
   }
 );
 

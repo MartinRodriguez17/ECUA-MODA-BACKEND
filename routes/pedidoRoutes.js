@@ -41,4 +41,8 @@ router.put(
   auth.verificarAdmin, // <-- ¡Blindaje activo!
   pedidoController.actualizarEstadoPedido
 );
+
+// --- NUEVA RUTA ADMIN: VER MIS VENTAS (PEDIDOS DONDE SOY EL VENDEDOR) ---
+router.get('/mis-ventas', auth.verificarToken, pedidoController.obtenerVentasMarca);
+
 module.exports = router;

@@ -31,6 +31,13 @@ exports.crearProducto = async (req, res) => {
     console.log('Error al crear producto:', error);
     res.status(500).json({ msg: 'Hubo un error en el servidor al subir la prenda' });
   }
+  if (req.body.tallas) {
+    try {
+      datosProducto.tallas = JSON.parse(req.body.tallas);
+    } catch (e) {
+      datosProducto.tallas = req.body.tallas; // por si acaso
+    }
+  }
 };
 
 // Función para obtener todos los productos
@@ -73,12 +80,19 @@ exports.actualizarProducto = async (req, res) => {
 
     const actualizaciones = { ...req.body };
 
-    // Convertimos las tallas de string "S,M,L" a array ["S","M","L"]
+    // Convertimos las tallas de string JSON a array de objetos
     if (req.body.tallas && typeof req.body.tallas === 'string') {
-      actualizaciones.tallas = req.body.tallas.split(',').filter(t => t.trim() !== '');
+      try {
+        actualizaciones.tallas = JSON.parse(req.body.tallas);
+      } catch (e) {
+        // Si falla el JSON, intentamos el formato viejo "S,M,L"
+        actualizaciones.tallas = req.body.tallas.split(',')
+          .filter(t => t.trim() !== '')
+          .map(t => ({ talla: t.trim(), stock: 1 }));
+      }
     }
 
-    // Si mandaron imágenes nuevas las actualizamos, si no conservamos las existentes
+    // Si mandaron imágenes nuevas las actualizamos
     if (req.files && req.files.length > 0) {
       actualizaciones.imagenes = req.files.map(file => file.path);
     }
@@ -118,17 +132,17 @@ exports.eliminarProducto = async (req, res) => {
 
 // Función para enviarle al frontend una lista limpia de las marcas que existen
 exports.obtenerMarcas = async (req, res) => {
-    try {
-        // Busca en tooooodos los productos y saca solo los nombres de las marcas sin repetir
-        const marcas = await Producto.distinct('marca');
-        
-        // Devuelve un arreglo limpiecito: ["Ecuador Street Cult", "Nike", "Adidas"]
-        res.json(marcas);
+  try {
+    // Busca en tooooodos los productos y saca solo los nombres de las marcas sin repetir
+    const marcas = await Producto.distinct('marca');
 
-    } catch (error) {
-        console.log('Error al obtener las marcas:', error);
-        res.status(500).send('Hubo un error al buscar las marcas bro');
-    }
+    // Devuelve un arreglo limpiecito: ["Ecuador Street Cult", "Nike", "Adidas"]
+    res.json(marcas);
+
+  } catch (error) {
+    console.log('Error al obtener las marcas:', error);
+    res.status(500).send('Hubo un error al buscar las marcas bro');
+  }
 }
 
 // Función para obtener solo los productos del usuario que está logueado
