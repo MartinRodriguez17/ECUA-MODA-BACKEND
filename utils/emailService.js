@@ -80,4 +80,102 @@ const enviarCorreoOTP = async (correoDestino, codigoOtp) => {
     }
 };
 
-module.exports = { enviarCorreoBienvenida, enviarCorreoOTP };
+// --- NUEVAS FUNCIONES PARA CORREOS DE PEDIDOS ---
+
+const enviarCorreoAprobacion = async (correoDestino, numeroRastreo, fotoUrl) => {
+  try {
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+    });
+
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: correoDestino,
+      subject: '✅ Tu pedido fue aprobado - Hub Moda Urbana',
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+          <h2 style="color: #f59e0b;">¡Tu pedido fue aprobado! 🎉</h2>
+          <p>Hemos verificado tu pago y tu pedido está en camino.</p>
+          <p><b>Número de rastreo:</b> <span style="font-size:18px; font-weight:bold;">${numeroRastreo}</span></p>
+          ${fotoUrl ? `<p><b>Comprobante de envío:</b></p><img src="${fotoUrl}" style="max-width:300px; border-radius:8px;" />` : ''}
+          <br>
+          <p>¡Gracias por comprar en Hub Moda Urbana! 🛍️</p>
+        </div>
+      `
+    });
+    console.log(`Correo aprobación enviado a: ${correoDestino}`);
+  } catch (error) {
+    console.error('Error enviando correo aprobación:', error);
+  }
+};
+
+const enviarCorreoRechazo = async (correoDestino, motivoRechazo) => {
+  try {
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+    });
+
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: correoDestino,
+      subject: '❌ Tu pedido fue rechazado - Hub Moda Urbana',
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+          <h2 style="color: #ef4444;">Tu pedido fue rechazado 😔</h2>
+          <p><b>Motivo:</b> ${motivoRechazo}</p>
+          <p>Si crees que es un error, contáctanos o vuelve a intentarlo.</p>
+          <br>
+          <p>Saludos,<br><b>El equipo del Hub 🗿</b></p>
+        </div>
+      `
+    });
+    console.log(`Correo rechazo enviado a: ${correoDestino}`);
+  } catch (error) {
+    console.error('Error enviando correo rechazo:', error);
+  }
+};
+
+const enviarCorreoEntregado = async (correoDestino) => {
+  try {
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+    });
+
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: correoDestino,
+      subject: '📦 Pedido entregado - Hub Moda Urbana',
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; text-align:center;">
+          <h2 style="color: #22c55e;">¡Tu pedido fue entregado! 🎊</h2>
+          <p>Esperamos que ames tu nueva prenda.</p>
+          <p>Gracias por ser parte de <b>Hub Moda Urbana</b>. ¡Vuelve pronto! 🛍️</p>
+          <br>
+          <p style="color:#888;">Si tienes algún problema con tu pedido, contáctanos.</p>
+        </div>
+      `
+    });
+    console.log(`Correo entregado enviado a: ${correoDestino}`);
+  } catch (error) {
+    console.error('Error enviando correo entregado:', error);
+  }
+};
+
+module.exports = { 
+  enviarCorreoBienvenida, 
+  enviarCorreoOTP,
+  enviarCorreoAprobacion,
+  enviarCorreoRechazo,
+  enviarCorreoEntregado,
+};
+
+module.exports = { 
+  enviarCorreoBienvenida, 
+  enviarCorreoOTP,
+  enviarCorreoAprobacion,
+  enviarCorreoRechazo,
+  enviarCorreoEntregado,
+};

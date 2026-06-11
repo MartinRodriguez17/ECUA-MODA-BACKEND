@@ -45,4 +45,7 @@ router.put(
 // --- NUEVA RUTA ADMIN: VER MIS VENTAS (PEDIDOS DONDE SOY EL VENDEDOR) ---
 router.get('/mis-ventas', auth.verificarToken, pedidoController.obtenerVentasMarca);
 
+// La ruta de actualizar estado ahora acepta una foto opcional
+router.put('/:id/estado', auth.verificarToken, upload.single('fotoEnvio'), pedidoController.actualizarEstadoPedido);
+
 module.exports = router;

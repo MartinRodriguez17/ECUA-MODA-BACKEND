@@ -8,6 +8,12 @@ const Pedido = require('../models/Pedido');
 const Producto = require('../models/Producto');
 // Importamos Cloudinary para manejar las imágenes de los productos (si es necesario)
 const cloudinary = require("cloudinary").v2;
+// Importamos las funciones para enviar correos relacionados con los pedidos
+const {
+  enviarCorreoAprobacion,
+  enviarCorreoRechazo,
+  enviarCorreoEntregado
+} = require('../utils/emailService');
 
 exports.crearPedido = async (req, res) => {
   try {
@@ -63,11 +69,11 @@ exports.crearPedido = async (req, res) => {
 
     // 3. Reducimos el stock DESPUÉS de guardar
     for (const item of productosMapeados) {
-  await Producto.findOneAndUpdate(
-    { _id: item.producto, 'tallas.talla': item.talla },
-    { $inc: { 'tallas.$.stock': -item.cantidad } }
-  );
-}
+      await Producto.findOneAndUpdate(
+        { _id: item.producto, 'tallas.talla': item.talla },
+        { $inc: { 'tallas.$.stock': -item.cantidad } }
+      );
+    }
 
     res.status(201).json({ msg: '¡Pedido recibido! Validaremos tu pago en breve 🏦', pedido });
 
@@ -122,23 +128,36 @@ exports.obtenerTodosLosPedidos = async (req, res) => {
 // --- NUEVA FUNCIÓN (ADMIN): ACTUALIZAR EL ESTADO DEL PEDIDO ---
 exports.actualizarEstadoPedido = async (req, res) => {
   try {
-    const { estado } = req.body; // Recibiremos "Aprobado", "Rechazado", etc.
-    const pedidoId = req.params.id; // El ID viaja en la URL
+    const { estado, motivoRechazo, numeroRastreo } = req.body;
+    const pedidoId = req.params.id;
 
-    const pedidoActualizado = await Pedido.findByIdAndUpdate(
-      pedidoId,
-      { estado: estado },
-      { new: true }
-    );
-
-    if (!pedidoActualizado) {
-      return res.status(404).json({ msg: "Pedido no encontrado bro 🛑" });
+    const pedido = await Pedido.findById(pedidoId);
+    if (!pedido) {
+      return res.status(404).json({ msg: 'Pedido no encontrado bro 🛑' });
     }
 
-    res.json({ msg: `¡Pedido ${estado} con éxito! 🔥`, pedido: pedidoActualizado });
+    // Subimos foto de envío si la mandan
+    let fotoEnvioUrl = null;
+    if (req.file) {
+      fotoEnvioUrl = req.file.path;
+    }
+
+    await Pedido.findByIdAndUpdate(pedidoId, { estado }, { new: true });
+
+    // Enviamos correo según el estado
+    if (estado === 'Aprobado') {
+      await enviarCorreoAprobacion(pedido.correoComprador, numeroRastreo, fotoEnvioUrl);
+    } else if (estado === 'Rechazado') {
+      await enviarCorreoRechazo(pedido.correoComprador, motivoRechazo || 'No especificado');
+    } else if (estado === 'Entregado') {
+      await enviarCorreoEntregado(pedido.correoComprador);
+    }
+
+    res.json({ msg: `¡Pedido ${estado} con éxito! 🔥` });
+
   } catch (error) {
-    console.error("Error al actualizar estado:", error);
-    res.status(500).json({ msg: "Hubo un error al actualizar el pedido" });
+    console.error('Error al actualizar estado:', error);
+    res.status(500).json({ msg: 'Hubo un error al actualizar el pedido' });
   }
 };
 
