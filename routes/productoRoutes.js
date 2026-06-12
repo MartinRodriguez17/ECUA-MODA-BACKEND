@@ -16,6 +16,12 @@ const validarMongoId = require('../middleware/validarMongoId');
 //  porque si no, se va a confundir y va a pensar que "marcas" es un ID de producto
 router.get('/marcas', productoController.obtenerMarcas);
 
+// Ruta para obtener solo los productos del usuario que está logueado
+router.get('/mis-productos', auth.verificarToken, productoController.obtenerMisProductos);
+router.get('/admin/todos', productoController.obtenerTodosProductosAdmin)
+// Rutas para el panel admin
+router.put('/admin/:id/ocultar', auth.verificarToken, productoController.ocultarProducto);
+
 // 2. Le metemos el middleware upload.single('imagen')
 // Esto le dice que espere UN solo archivo y que ese archivo vendrá en un campo llamado 'imagen'
 router.post('/', auth.verificarToken, upload.array('imagenes', 4), productoController.crearProducto);
@@ -30,11 +36,5 @@ router.put('/:id', auth.verificarToken, upload.array('imagenes', 4), productoCon
 // DELETE: Eliminar un producto específico (necesitamos su ID)
 router.delete('/:id', validarMongoId, auth.verificarTokenYRol, productoController.eliminarProducto);
 
-// Ruta para obtener solo los productos del usuario que está logueado
-router.get('/mis-productos', auth.verificarToken, productoController.obtenerMisProductos);
-
-// Rutas para el panel admin
-router.get('/admin/todos', auth.verificarToken, productoController.obtenerTodosProductosAdmin);
-router.put('/admin/:id/ocultar', auth.verificarToken, productoController.ocultarProducto);
 
 module.exports = router;

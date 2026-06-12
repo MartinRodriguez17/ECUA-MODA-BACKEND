@@ -161,10 +161,13 @@ exports.obtenerMisProductos = async (req, res) => {
 
 // RUTAS PARA EL PANEL ADMIN
 exports.obtenerTodosProductosAdmin = async (req, res) => {
-  try {
+ try {
+    console.log('🔥 Llegó a obtenerTodosProductosAdmin'); // 👈
     const productos = await Producto.find().sort({ createdAt: -1 });
+    console.log('Productos encontrados:', productos.length); // 👈
     res.json(productos);
   } catch (error) {
+    console.log('Error:', error); // 👈
     res.status(500).json({ msg: 'Error al obtener productos bro' });
   }
 };

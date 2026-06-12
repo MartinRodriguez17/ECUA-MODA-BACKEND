@@ -34,6 +34,10 @@ const productoSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    oculto: {
+      type: Boolean,
+      default: false,
+    },
     tallas: [
       {
         talla: {
