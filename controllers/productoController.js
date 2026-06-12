@@ -61,6 +61,7 @@ exports.obtenerProductos = async (req, res) => {
       // Busca cualquier producto cuyo NOMBRE contenga lo que el usuario escribió
       filtro.nombre = new RegExp(buscar, "i");
     }
+    filtro.oculto = { $ne: true }; // Solo muestra los productos que NO están ocultos
     // Buscamos en la base de datos usando el filtro que armamos
     const productos = await Producto.find(filtro);
     res.json(productos);
@@ -157,3 +158,28 @@ exports.obtenerMisProductos = async (req, res) => {
 };
 // esto se hace para que los del frontend puedan usar estas funciones 
 // cuando hagan peticiones a las rutas que definimos en productoRoutes.js
+
+// RUTAS PARA EL PANEL ADMIN
+exports.obtenerTodosProductosAdmin = async (req, res) => {
+  try {
+    const productos = await Producto.find().sort({ createdAt: -1 });
+    res.json(productos);
+  } catch (error) {
+    res.status(500).json({ msg: 'Error al obtener productos bro' });
+  }
+};
+
+exports.ocultarProducto = async (req, res) => {
+  try {
+    const { oculto } = req.body;
+    const producto = await Producto.findByIdAndUpdate(
+      req.params.id,
+      { oculto },
+      { new: true }
+    );
+    if (!producto) return res.status(404).json({ msg: 'Producto no encontrado' });
+    res.json({ msg: `Producto ${oculto ? 'ocultado' : 'visible'} ✅` });
+  } catch (error) {
+    res.status(500).json({ msg: 'Error bro' });
+  }
+};

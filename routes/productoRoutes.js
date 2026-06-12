@@ -33,4 +33,8 @@ router.delete('/:id', validarMongoId, auth.verificarTokenYRol, productoControlle
 // Ruta para obtener solo los productos del usuario que está logueado
 router.get('/mis-productos', auth.verificarToken, productoController.obtenerMisProductos);
 
+// Rutas para el panel admin
+router.get('/admin/todos', auth.verificarToken, productoController.obtenerTodosProductosAdmin);
+router.put('/admin/:id/ocultar', auth.verificarToken, productoController.ocultarProducto);
+
 module.exports = router;

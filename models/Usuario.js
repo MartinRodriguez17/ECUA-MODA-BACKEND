@@ -27,11 +27,16 @@ const UsuarioSchema = mongoose.Schema({
         type: Date,
         default: Date.now
     },
-    
+
     fotoUrl: {
-    type: String,
-    default: "" // Por defecto vacío hasta que suban una foto
-  },
+        type: String,
+        default: "" // Por defecto vacío hasta que suban una foto
+    },
+    estadoCuenta: {
+        type: String,
+        enum: ['activo', 'suspendido', 'baneado'],
+        default: 'activo',
+    },
 });
 
 module.exports = mongoose.model('Usuario', UsuarioSchema);

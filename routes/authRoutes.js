@@ -37,4 +37,11 @@ const {
 router.post('/recuperar-password', generarOtpRecuperacion);
 router.post('/restablecer-password', restablecerPassword);
 
+// RUTA PARA LOGIN DE ADMIN
+router.post('/login-admin', authController.loginAdmin);
+
+// RUTAS ADMIN PARA GESTIÓN DE USUARIOS
+router.get('/admin/usuarios', auth.verificarToken, authController.obtenerTodosUsuarios);
+router.put('/admin/usuarios/:tipo/:id/estado', auth.verificarToken, authController.cambiarEstadoUsuario);
+
 module.exports = router;

@@ -374,3 +374,64 @@ exports.restablecerPassword = async (req, res) => {
     res.status(500).send("Hubo un error al restablecer la contraseña");
   }
 };
+
+// --- LOGIN DE ADMIN ---
+exports.loginAdmin = async (req, res) => {
+  const { nombre, password } = req.body;
+
+  try {
+    const admin = await Usuario.findOne({ nombre, rol: 'admin' });
+
+    if (!admin) {
+      return res.status(400).json({ msg: 'Credenciales incorrectas' });
+    }
+
+    const passwordCorrecto = await bcrypt.compare(password, admin.password);
+    if (!passwordCorrecto) {
+      return res.status(400).json({ msg: 'Credenciales incorrectas' });
+    }
+
+    const payload = { usuario: { id: admin.id, rol: 'admin' } };
+
+    jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '30d' }, (error, token) => {
+      if (error) throw error;
+      res.json({ token });
+    });
+
+  } catch (error) {
+    console.log('Error login admin:', error);
+    res.status(500).send('Error en el servidor');
+  }
+};
+
+// --- ADMIN: OBTENER TODOS LOS USUARIOS Y MARCAS ---
+exports.obtenerTodosUsuarios = async (req, res) => {
+  try {
+    const clientes = await Usuario.find({ rol: { $ne: 'admin' } }).select('-password');
+    const marcas = await Marca.find().select('-password');
+
+    res.json({ clientes, marcas });
+  } catch (error) {
+    console.error('Error al obtener usuarios:', error);
+    res.status(500).json({ msg: 'Error al obtener usuarios bro' });
+  }
+};
+
+// --- ADMIN: SUSPENDER O BANEAR USUARIO ---
+exports.cambiarEstadoUsuario = async (req, res) => {
+  try {
+    const { estado } = req.body; // 'activo', 'suspendido', 'baneado'
+    const { id, tipo } = req.params; // tipo: 'usuario' o 'marca'
+
+    if (tipo === 'marca') {
+      await Marca.findByIdAndUpdate(id, { estadoAprobacion: estado });
+    } else {
+      await Usuario.findByIdAndUpdate(id, { estadoCuenta: estado });
+    }
+
+    res.json({ msg: `Usuario ${estado} con éxito ✅` });
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ msg: 'Error al cambiar estado bro' });
+  }
+};
