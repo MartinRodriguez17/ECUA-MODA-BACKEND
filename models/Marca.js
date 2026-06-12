@@ -42,11 +42,24 @@ const MarcaSchema = mongoose.Schema({
   },
   estadoAprobacion: {
     type: String,
-    default: "Pendiente", // Cuando te mandan la solicitud, nace como Pendiente
+    default: 'Pendiente',
   },
-  fechaSolicitud: {
+  estadoCuenta: {
+    type: String,
+    enum: ['activo', 'bloqueado', 'suspendido', 'baneado'],
+    default: 'activo',
+  },
+  suspendidoHasta: {
     type: Date,
-    default: Date.now,
+    default: null,
+  },
+  motivoEstado: {
+    type: String,
+    default: '',
+  },
+  correoBaneado: {
+    type: Boolean,
+    default: false,
   },
 });
 

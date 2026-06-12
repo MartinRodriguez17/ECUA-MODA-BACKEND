@@ -164,12 +164,83 @@ const enviarCorreoEntregado = async (correoDestino) => {
   }
 };
 
-module.exports = { 
-  enviarCorreoBienvenida, 
-  enviarCorreoOTP,
-  enviarCorreoAprobacion,
-  enviarCorreoRechazo,
-  enviarCorreoEntregado,
+// --- NUEVA FUNCIÓN PARA CORREOS DE SANCIONES (Bloqueo, Suspensión, Baneo) ---
+const enviarCorreoSancion = async (correoDestino, tipo, motivo, dias = null) => {
+  try {
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+    });
+
+    const configs = {
+      bloqueado: {
+        asunto: '🔒 Tu cuenta ha sido bloqueada - Hub Moda Urbana',
+        color: '#f97316',
+        titulo: 'Cuenta Bloqueada',
+        descripcion: 'Tu cuenta ha sido bloqueada. Puedes seguir navegando en la app pero no podrás realizar compras ni gestionar productos hasta que se resuelva esta situación.',
+      },
+      suspendido: {
+        asunto: '⏸️ Tu cuenta ha sido suspendida - Hub Moda Urbana',
+        color: '#9333ea',
+        titulo: `Cuenta Suspendida por ${dias} día(s)`,
+        descripcion: `Tu cuenta ha sido suspendida temporalmente por ${dias} día(s). Durante este tiempo no podrás acceder a la aplicación.`,
+      },
+      baneado: {
+        asunto: '🚫 Tu cuenta ha sido eliminada - Hub Moda Urbana',
+        color: '#ef4444',
+        titulo: 'Cuenta Eliminada Permanentemente',
+        descripcion: 'Tu cuenta ha sido eliminada permanentemente de Hub Moda Urbana. Esta decisión es definitiva.',
+      },
+    };
+
+    const config = configs[tipo] || configs.bloqueado;
+
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: correoDestino,
+      subject: config.asunto,
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+          <h2 style="color: ${config.color};">${config.titulo}</h2>
+          <p>${config.descripcion}</p>
+          <p><b>Motivo:</b> ${motivo}</p>
+          <br>
+          <p style="color: #888; font-size: 12px;">Si crees que esto es un error, contacta a soporte.</p>
+          <p>Saludos,<br><b>El equipo de Hub Moda Urbana 🗿</b></p>
+        </div>
+      `
+    });
+  } catch (error) {
+    console.error('Error enviando correo sanción:', error);
+  }
+};
+
+// --- NUEVA FUNCIÓN PARA CORREO DE ACEPTACIÓN DE MARCA ---
+const enviarCorreoAceptacionMarca = async (correoDestino, nombreMarca) => {
+  try {
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+    });
+
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: correoDestino,
+      subject: '✅ ¡Tu marca fue aceptada! - Hub Moda Urbana',
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+          <h2 style="color: #22c55e;">¡Felicitaciones ${nombreMarca}! 🎉</h2>
+          <p>Tu solicitud para unirte al <b>Hub de Moda Urbana</b> ha sido <b>aprobada</b>.</p>
+          <p>Ya puedes iniciar sesión y comenzar a subir tus productos.</p>
+          <br>
+          <p>¡Bienvenido a la familia!</p>
+          <p>Saludos,<br><b>El equipo del Hub 🗿</b></p>
+        </div>
+      `
+    });
+  } catch (error) {
+    console.error('Error enviando correo aceptación marca:', error);
+  }
 };
 
 module.exports = { 
@@ -178,4 +249,6 @@ module.exports = {
   enviarCorreoAprobacion,
   enviarCorreoRechazo,
   enviarCorreoEntregado,
+  enviarCorreoSancion,
+  enviarCorreoAceptacionMarca,
 };

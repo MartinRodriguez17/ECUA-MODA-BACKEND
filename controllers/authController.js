@@ -1,33 +1,26 @@
 // Archivo: backend/controllers/authController.js
 // aqui vamos a manejar todo lo relacionado con el registro y login de usuarios
-// Importamos el modelo de Marca para poder crear nuevas marcas y verificar los existentes
-const Marca = require("../models/Marca");
-// Importamos el modelo de Usuario para poder crear nuevos usuarios y verificar los existentes
-const Usuario = require("../models/Usuario");
-// Importamos bcrypt para encriptar las contraseñas y jwt para crear los Tokens de autenticación
-const bcrypt = require("bcryptjs");
-// 1. Importamos la librería para los Pases VIP
-const jwt = require("jsonwebtoken");
-// Importamos el modelo de Otp para manejar los códigos de verificación por correo
-const Otp = require("../models/Otp");
-// Importamos la función para enviar correos (si es que la usaremos aquí)
-const { enviarCorreoOTP } = require("../utils/emailService");
 
-// --- NUEVO: Generar OTP para Clientes Normales ---
+const Marca = require("../models/Marca");
+const Usuario = require("../models/Usuario");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const Otp = require("../models/Otp");
+const { enviarCorreoOTP, enviarCorreoSancion, enviarCorreoAceptacionMarca } = require('../utils/emailService');
+
+// --- GENERAR OTP PARA CLIENTES ---
 exports.generarOtpUsuario = async (req, res) => {
   try {
     const email = req.body.email?.trim().toLowerCase();
-    const nombre = req.body.nombre?.trim(); // Recibimos el nombre/username de Flutter
+    const nombre = req.body.nombre?.trim(); 
 
     if (!email) return res.status(400).json({ msg: "Falta el correo bro" });
 
-    // 1. Validamos que el correo no esté repetido
     const usuarioExistente = await Usuario.findOne({ email });
     if (usuarioExistente) {
       return res.status(400).json({ msg: "Bro, este correo ya tiene una cuenta activa" });
     }
 
-    // 2. ¡EL NUEVO BLOQUEO!: Evitamos nombres de usuario duplicados (ej: alexis777)
     if (nombre) {
       const usernameRepetido = await Usuario.findOne({ nombre: new RegExp(`^${nombre}$`, 'i') });
       if (usernameRepetido) {
@@ -49,26 +42,19 @@ exports.generarOtpUsuario = async (req, res) => {
   }
 };
 
-
-// Función para registrar un nuevo usuario
+// --- REGISTRAR USUARIO ---
 exports.registrarUsuario = async (req, res) => {
   try {
-    // 1. Extraemos TODOS los datos, incluyendo el NUEVO codigoOtp
     const { nombre, email, password, codigoOtp } = req.body;
 
-    // Validamos que no falten datos
     if (!nombre || !email || !password || !codigoOtp) {
-      return res.status(400).json({
-        msg: "Bro, faltan datos o el código de verificación 🛑",
-      });
+      return res.status(400).json({ msg: "Bro, faltan datos o el código de verificación 🛑" });
     }
 
-    // Blindaje Anti-XSS (para el nombre)
     if (/[<>]/.test(nombre)) {
       return res.status(400).json({ msg: "Nada de hacks en el nombre, bro 🛡️" });
     }
 
-    // --- EL GUARDIA DE CONTRASEÑAS ---
     const passwordRegex = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
     if (!passwordRegex.test(password)) {
       return res.status(400).json({
@@ -76,38 +62,29 @@ exports.registrarUsuario = async (req, res) => {
       });
     }
 
-    // --- EL NUEVO ESCUDO OTP ---
-    // Buscamos si el código coincide con el correo en la base de datos
     const otpGuardado = await Otp.findOne({ correo: email.toLowerCase(), codigo: codigoOtp });
-
     if (!otpGuardado) {
       return res.status(400).json({ msg: "Código incorrecto o ya expiró (duraba 5 min) ⏳" });
     }
 
-    // Si el código es correcto, lo destruimos para que no se re-use
     await Otp.deleteOne({ _id: otpGuardado._id });
 
-    // 2. Revisamos si el usuario ya existe (por si acaso)
     let usuario = await Usuario.findOne({ email: email.toLowerCase() });
     if (usuario) {
       return res.status(400).json({ msg: "Bro, este correo ya está registrado" });
     }
 
-    // 3. Si no existe, creamos el nuevo usuario
     usuario = new Usuario({
       nombre,
       email: email.toLowerCase(),
       password,
     });
 
-    // 4. ¡LA MAGIA DE LA ENCRIPTACIÓN!
     const salt = await bcrypt.genSalt(10);
     usuario.password = await bcrypt.hash(password, salt);
 
-    // 5. Lo guardamos en la base de datos (Atlas)
     await usuario.save();
 
-    // 6. ¡AUTO-LOGIN! Armamos su Pase VIP (El Payload)
     const payload = {
       usuario: {
         id: usuario.id,
@@ -115,7 +92,6 @@ exports.registrarUsuario = async (req, res) => {
       },
     };
 
-    // 7. Firmamos y entregamos el Token
     jwt.sign(
       payload,
       process.env.JWT_SECRET,
@@ -134,42 +110,51 @@ exports.registrarUsuario = async (req, res) => {
   }
 };
 
-// Función para iniciar sesión
-
-// Función para iniciar sesión
+// --- INICIAR SESIÓN (CORREGIDO) ---
 exports.loginUsuario = async (req, res) => {
   const { email, password } = req.body;
 
   try {
     let esMarca = false;
-
-    // --- EL PARCHE MÁGICO ---
-    // Convertimos lo que escriba el usuario a minúsculas antes de buscar
     const correoNormalizado = email.toLowerCase();
 
-    // 1. Buscamos primero en la colección de clientes normales usando el correo en minúsculas
+    // 1. Buscamos primero en la colección de clientes normales
     let usuario = await Usuario.findOne({ email: correoNormalizado });
 
     // 2. Si no lo encuentra, buscamos en la colección de marcas
     if (!usuario) {
-      // También buscamos aquí con el correo en minúsculas
       usuario = await Marca.findOne({ correo: correoNormalizado });
 
       if (!usuario) {
         return res.status(400).json({ msg: "El usuario o marca no existe bro" });
       }
-      // --- ¡NUEVO ESCUDO ANTI-PENDIENTES! ---
+
       if (usuario.estadoAprobacion !== "Aceptada") {
-        return res
-          .status(403)
-          .json({
-            msg: "Tu marca aún está en revisión bro, espera a que el admin te apruebe 🕒",
-          });
+        return res.status(403).json({
+          msg: "Tu marca aún está en revisión bro, espera a que el admin te apruebe 🕒",
+        });
       }
       esMarca = true;
     }
 
-    // 3. Comparamos la contraseña encriptada
+    // --- ESCUDO DE SUSPENSIÓN Y BANEO (MOVIDO AQUÍ ADENTRO ANTES DEL TOKEN) ---
+    if (usuario.estadoCuenta === 'suspendido' && usuario.suspendidoHasta) {
+      // Si ya pasó la fecha de suspensión, lo volvemos a activar automáticamente
+      if (new Date() > new Date(usuario.suspendidoHasta)) {
+        if (esMarca) {
+          await Marca.findByIdAndUpdate(usuario._id, { estadoCuenta: 'activo', suspendidoHasta: null });
+        } else {
+          await Usuario.findByIdAndUpdate(usuario._id, { estadoCuenta: 'activo', suspendidoHasta: null });
+        }
+        usuario.estadoCuenta = 'activo';
+      } else {
+        // Si sigue suspendido, bloqueamos el paso
+        const diasRestantes = Math.ceil((new Date(usuario.suspendidoHasta) - new Date()) / (1000 * 60 * 60 * 24));
+        return res.status(403).json({ msg: `Tu cuenta está suspendida. Quedan ${diasRestantes} día(s) 🛑` });
+      }
+    }
+
+    // 3. Comparamos la contraseña
     const passwordCorrecto = await bcrypt.compare(password, usuario.password);
     if (!passwordCorrecto) {
       return res.status(400).json({ msg: "Contraseña incorrecta pana" });
@@ -179,7 +164,7 @@ exports.loginUsuario = async (req, res) => {
     const payload = {
       usuario: {
         id: usuario.id,
-        rol: esMarca ? "marca" : usuario.rol, // Asignamos el rol correcto
+        rol: esMarca ? "marca" : usuario.rol, 
       },
     };
 
@@ -187,37 +172,20 @@ exports.loginUsuario = async (req, res) => {
     jwt.sign(
       payload,
       process.env.JWT_SECRET,
-      { expiresIn: "30d" },
+      { expiresIn: '30d' },
       (error, token) => {
         if (error) throw error;
         res.json({ token });
-      },
+      }
     );
+
   } catch (error) {
     console.log("Error en el login:", error);
     res.status(500).send("Hubo un error al iniciar sesión");
   }
 };
 
-// --- NUEVA FUNCIÓN: OBTENER PERFIL DEL USUARIO LOGUEADO ---
-exports.obtenerPerfilUsuario = async (req, res) => {
-  try {
-    // El middleware de autenticación (auth.js) ya nos dejó el ID seguro en req.usuario.id
-    // El .select('-password') es vital para que la contraseña encriptada no viaje al frontend
-    const usuario = await Usuario.findById(req.usuario.id).select('-password');
-
-    if (!usuario) {
-      return res.status(404).json({ msg: "Usuario no encontrado bro" });
-    }
-
-    res.json(usuario);
-  } catch (error) {
-    console.error("Error al obtener perfil:", error);
-    res.status(500).send("Hubo un error en el servidor al buscar tu perfil");
-  }
-};
-
-// --- OBTENER PERFIL ---
+// --- OBTENER PERFIL (ELIMINADO DUPLICADO) ---
 exports.obtenerPerfilUsuario = async (req, res) => {
   try {
     const id = req.usuario.id;
@@ -259,8 +227,7 @@ exports.actualizarPerfil = async (req, res) => {
     }
 
     if (rol === 'marca') {
-      // Para marcas actualizamos en la colección Marca
-      if (nombre) actualizaciones.nombreMarca = nombre; // ajusta al campo correcto
+      if (nombre) actualizaciones.nombreMarca = nombre;
 
       const marcaActualizada = await Marca.findByIdAndUpdate(
         req.usuario.id,
@@ -280,7 +247,6 @@ exports.actualizarPerfil = async (req, res) => {
       });
     }
 
-    // Para usuarios normales
     if (nombre) {
       const usernameRepetido = await Usuario.findOne({
         nombre: new RegExp(`^${nombre}$`, 'i'),
@@ -305,13 +271,13 @@ exports.actualizarPerfil = async (req, res) => {
     res.status(500).json({ msg: 'Hubo un error al guardar tus cambios bro' });
   }
 };
-// --- RECUPERACIÓN DE CONTRASEÑA: PASO 1 - Enviar código ---
+
+// --- OTP RECUPERACIÓN ---
 exports.generarOtpRecuperacion = async (req, res) => {
   try {
     const email = req.body.email?.trim().toLowerCase();
     if (!email) return res.status(400).json({ msg: "Falta el correo bro" });
 
-    // Verificamos que el correo SÍ exista (al revés que en el registro)
     const usuario = await Usuario.findOne({ email });
     if (!usuario) {
       return res.status(404).json({ msg: "No existe una cuenta con ese correo" });
@@ -332,7 +298,7 @@ exports.generarOtpRecuperacion = async (req, res) => {
   }
 };
 
-// --- RECUPERACIÓN DE CONTRASEÑA: PASO 2 - Verificar código y cambiar contraseña ---
+// --- RESTABLECER PASSWORD ---
 exports.restablecerPassword = async (req, res) => {
   try {
     const { email, codigoOtp, nuevaPassword } = req.body;
@@ -341,7 +307,6 @@ exports.restablecerPassword = async (req, res) => {
       return res.status(400).json({ msg: "Faltan datos bro 🛑" });
     }
 
-    // Validamos la nueva contraseña con el mismo estándar del registro
     const passwordRegex = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
     if (!passwordRegex.test(nuevaPassword)) {
       return res.status(400).json({
@@ -349,16 +314,13 @@ exports.restablecerPassword = async (req, res) => {
       });
     }
 
-    // Verificamos el código OTP
     const otpGuardado = await Otp.findOne({ correo: email.toLowerCase(), codigo: codigoOtp });
     if (!otpGuardado) {
       return res.status(400).json({ msg: "Código incorrecto o ya expiró (duraba 5 min) ⏳" });
     }
 
-    // Código correcto, lo destruimos
     await Otp.deleteOne({ _id: otpGuardado._id });
 
-    // Actualizamos la contraseña
     const salt = await bcrypt.genSalt(10);
     const passwordEncriptada = await bcrypt.hash(nuevaPassword, salt);
 
@@ -375,7 +337,7 @@ exports.restablecerPassword = async (req, res) => {
   }
 };
 
-// --- LOGIN DE ADMIN ---
+// --- LOGIN ADMIN ---
 exports.loginAdmin = async (req, res) => {
   const { nombre, password } = req.body;
 
@@ -404,7 +366,7 @@ exports.loginAdmin = async (req, res) => {
   }
 };
 
-// --- ADMIN: OBTENER TODOS LOS USUARIOS Y MARCAS ---
+// --- OBTENER TODOS LOS USUARIOS ---
 exports.obtenerTodosUsuarios = async (req, res) => {
   try {
     const clientes = await Usuario.find({ rol: { $ne: 'admin' } }).select('-password');
@@ -417,21 +379,88 @@ exports.obtenerTodosUsuarios = async (req, res) => {
   }
 };
 
-// --- ADMIN: SUSPENDER O BANEAR USUARIO ---
+// --- CAMBIAR ESTADO USUARIO ---
 exports.cambiarEstadoUsuario = async (req, res) => {
   try {
-    const { estado } = req.body; // 'activo', 'suspendido', 'baneado'
-    const { id, tipo } = req.params; // tipo: 'usuario' o 'marca'
+    const { estado, motivo, dias } = req.body;
+    const { id, tipo } = req.params;
 
-    if (tipo === 'marca') {
-      await Marca.findByIdAndUpdate(id, { estadoAprobacion: estado });
-    } else {
-      await Usuario.findByIdAndUpdate(id, { estadoCuenta: estado });
+    if (!motivo) {
+      return res.status(400).json({ msg: 'Debes ingresar un motivo 🛑' });
     }
 
-    res.json({ msg: `Usuario ${estado} con éxito ✅` });
+    if (tipo === 'marca') {
+      const marca = await Marca.findById(id);
+      if (!marca) return res.status(404).json({ msg: 'Marca no encontrada' });
+
+      const actualizaciones = { estadoCuenta: estado, motivoEstado: motivo };
+
+      if (estado === 'suspendido') {
+        if (!dias || dias < 1 || dias > 30) {
+          return res.status(400).json({ msg: 'Los días deben ser entre 1 y 30 🛑' });
+        }
+        const fecha = new Date();
+        fecha.setDate(fecha.getDate() + parseInt(dias));
+        actualizaciones.suspendidoHasta = fecha;
+      }
+
+      if (estado === 'baneado') {
+        actualizaciones.correoBaneado = true;
+        await Marca.findByIdAndDelete(id);
+        await enviarCorreoSancion(marca.correo, 'baneado', motivo);
+        return res.json({ msg: 'Marca baneada y eliminada ✅' });
+      }
+
+      await Marca.findByIdAndUpdate(id, actualizaciones);
+      await enviarCorreoSancion(marca.correo, estado, motivo, dias);
+
+    } else {
+      const usuario = await Usuario.findById(id);
+      if (!usuario) return res.status(404).json({ msg: 'Usuario no encontrado' });
+
+      const actualizaciones = { estadoCuenta: estado, motivoEstado: motivo };
+
+      if (estado === 'suspendido') {
+        if (!dias || dias < 1 || dias > 30) {
+          return res.status(400).json({ msg: 'Los días deben ser entre 1 y 30 🛑' });
+        }
+        const fecha = new Date();
+        fecha.setDate(fecha.getDate() + parseInt(dias));
+        actualizaciones.suspendidoHasta = fecha;
+      }
+
+      if (estado === 'baneado') {
+        actualizaciones.correoBaneado = true;
+        await Usuario.findByIdAndDelete(id);
+        await enviarCorreoSancion(usuario.email, 'baneado', motivo);
+        return res.json({ msg: 'Usuario baneado y eliminada ✅' });
+      }
+
+      await Usuario.findByIdAndUpdate(id, actualizaciones);
+      await enviarCorreoSancion(usuario.email, estado, motivo, dias);
+    }
+
+    res.json({ msg: `Cuenta ${estado} con éxito ✅` });
+
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ msg: 'Error al cambiar estado bro' });
+  }
+};
+
+// --- ACEPTAR MARCA ---
+exports.aceptarMarca = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const marca = await Marca.findById(id);
+    if (!marca) return res.status(404).json({ msg: 'Marca no encontrada' });
+
+    await Marca.findByIdAndUpdate(id, { estadoAprobacion: 'Aceptada' });
+    await enviarCorreoAceptacionMarca(marca.correo, marca.nombreMarca);
+
+    res.json({ msg: '¡Marca aceptada y notificada! 🎉' });
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ msg: 'Error al aceptar marca bro' });
   }
 };

@@ -4,39 +4,56 @@
 const mongoose = require('mongoose');
 
 const UsuarioSchema = mongoose.Schema({
-    nombre: {
-        type: String,
-        required: true,
-        trim: true
-    },
-    email: {
-        type: String,
-        required: true,
-        unique: true, // ¡Súper importante! Evita que se registren dos veces con el mismo correo
-        trim: true
-    },
-    password: {
-        type: String,
-        required: true
-    },
-    rol: {
-        type: String,
-        default: 'cliente' // Por defecto, el que se registre será un cliente normal
-    },
-    fechaRegistro: {
-        type: Date,
-        default: Date.now
-    },
+  nombre: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    trim: true
+  },
+  password: {
+    type: String,
+    required: true
+  },
+  rol: {
+    type: String,
+    default: 'cliente'
+  },
+  fechaRegistro: {
+    type: Date,
+    default: Date.now
+  },
+  fotoUrl: {
+    type: String,
+    default: ''
+  },
 
-    fotoUrl: {
-        type: String,
-        default: "" // Por defecto vacío hasta que suban una foto
-    },
-    estadoCuenta: {
-        type: String,
-        enum: ['activo', 'suspendido', 'baneado'],
-        default: 'activo',
-    },
+  // --- ESTADO DE CUENTA ---
+  estadoCuenta: {
+    type: String,
+    enum: ['activo', 'bloqueado', 'suspendido', 'baneado'],
+    default: 'activo',
+  },
+
+  // --- SUSPENSIÓN TEMPORAL ---
+  suspendidoHasta: {
+    type: Date,
+    default: null,
+  },
+  motivoEstado: {
+    type: String,
+    default: '',
+  },
+
+  // --- CORREOS BANEADOS (para evitar re-registro) ---
+  correoBaneado: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 module.exports = mongoose.model('Usuario', UsuarioSchema);
