@@ -15,6 +15,21 @@ exports.crearProducto = async (req, res) => {
 
     const datosProducto = { ...req.body };
 
+    if (req.body.tallas) {
+      try {
+        datosProducto.tallas = JSON.parse(req.body.tallas);
+      } catch (e) {
+        // Si el frontend envía un string normal "S,M,L" en vez de un JSON string
+        if (typeof req.body.tallas === 'string') {
+          datosProducto.tallas = req.body.tallas.split(',')
+            .filter(t => t.trim() !== '')
+            .map(t => ({ talla: t.trim(), stock: 1 }));
+        } else {
+          datosProducto.tallas = req.body.tallas; // por si acaso
+        }
+      }
+    }
+
     // Ahora atrapamos múltiples fotos
     if (req.files && req.files.length > 0) {
       datosProducto.imagenes = req.files.map(file => file.path); // 👈 array de URLs
