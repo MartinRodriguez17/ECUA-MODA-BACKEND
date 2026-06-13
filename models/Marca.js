@@ -61,6 +61,14 @@ const MarcaSchema = mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  calificacionPromedio: {
+    type: Number,
+    default: 0,
+  },
+  totalResenas: {
+    type: Number,
+    default: 0,
+  },
 });
 
 module.exports = mongoose.model("Marca", MarcaSchema);

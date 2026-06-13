@@ -5,6 +5,8 @@
 // Archivo: controllers/marcaController.js
 const Marca = require("../models/Marca");
 const bcrypt = require("bcryptjs");
+// Importamos el modelo de Usuario para verificar que el correo no esté registrado como cliente
+const Usuario = require('../models/Usuario'); 
 // Importamos el súper validador de RUC que hicimos
 const { validarRucEcuador } = require("../utils/validadorRUC");
 
@@ -50,6 +52,11 @@ exports.generarOtp = async (req, res) => {
     const marcaExistente = await Marca.findOne({ correo });
     if (marcaExistente) {
       return res.status(400).json({ msg: "Este correo ya está registrado" });
+    }
+
+    const usuarioExistente = await Usuario.findOne({ email: correo });
+    if (usuarioExistente) {
+      return res.status(400).json({ msg: "Este correo ya está registrado como cliente bro 🛑" });
     }
 
     // 1. Generamos un código de 6 dígitos al azar

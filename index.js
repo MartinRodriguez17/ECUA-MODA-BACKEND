@@ -95,6 +95,9 @@ app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/pedidos", require("./routes/pedidoRoutes"));
 app.use("/api/marcas", require("./routes/marcas"));
 
+// RUTAS DE LA API
+app.use('/api/resenas', require('./routes/resenaRoutes'));
+
 app.listen(PORT, () => {
   console.log(`Servidor corriendo de forma exitosa en el puerto ${PORT}`);
 });

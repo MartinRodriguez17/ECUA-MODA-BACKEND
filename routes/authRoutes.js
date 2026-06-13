@@ -44,4 +44,8 @@ router.post('/login-admin', authController.loginAdmin);
 router.get('/admin/usuarios', auth.verificarToken, authController.obtenerTodosUsuarios);
 router.put('/admin/usuarios/:tipo/:id/estado', auth.verificarToken, authController.cambiarEstadoUsuario);
 
+router.put('/admin/marcas/:id/aceptar', auth.verificarToken, authController.aceptarMarca);
+//| RUTA PARA OBTENER TODOS LOS USUARIOS (SOLO PARA ADMIN)
+module.exports = router;
+
 module.exports = router;

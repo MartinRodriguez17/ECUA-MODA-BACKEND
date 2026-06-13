@@ -84,17 +84,19 @@ exports.crearPedido = async (req, res) => {
 }
 
 exports.obtenerMisPedidos = async (req, res) => {
-  try {
-    // 1. Buscamos el correo real del usuario logueado usando su ID del token
+   try {
     const Usuario = require("../models/Usuario");
     const usuarioLogueado = await Usuario.findById(req.usuario.id);
-
     if (!usuarioLogueado) {
       return res.status(404).json({ msg: "Usuario no encontrado bro 🛑" });
     }
 
-    // 2. Buscamos todos los pedidos donde el correoComprador sea igual al del usuario
-    const pedidos = await Pedido.find({ correoComprador: usuarioLogueado.email }).sort({ fechaCreacion: -1 });
+    const pedidos = await Pedido.find({ correoComprador: usuarioLogueado.email })
+      .populate({
+        path: 'productos.producto',
+        select: 'nombre marcaId marcaNombre imagenes precio', // 👈 traemos marcaId
+      })
+      .sort({ fechaCreacion: -1 });
 
     res.json(pedidos);
   } catch (error) {

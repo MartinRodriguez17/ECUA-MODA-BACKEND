@@ -21,6 +21,11 @@ exports.generarOtpUsuario = async (req, res) => {
       return res.status(400).json({ msg: "Bro, este correo ya tiene una cuenta activa" });
     }
 
+    const marcaExistente = await Marca.findOne({ correo: email });
+    if (marcaExistente) {
+      return res.status(400).json({ msg: "Este correo ya está registrado como vendedor bro 🛑" });
+    }
+    
     if (nombre) {
       const usernameRepetido = await Usuario.findOne({ nombre: new RegExp(`^${nombre}$`, 'i') });
       if (usernameRepetido) {
