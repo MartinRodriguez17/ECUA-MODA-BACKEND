@@ -21,6 +21,30 @@ const productoSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Usuario'
     },
+    marca: {                   
+      type: String,
+      default: '',
+      trim: true,
+    },
+    precio: {
+      type: Number,
+      required: true,
+    },
+    descripcion: {             
+      type: String,
+      default: '',
+      trim: true,
+    },
+    categoria: {             
+      type: String,
+      default: '',
+      trim: true,
+    },
+    genero: {                   
+      type: String,
+      default: '',
+      trim: true,
+    },
     precio: {
       type: Number,
       required: true,

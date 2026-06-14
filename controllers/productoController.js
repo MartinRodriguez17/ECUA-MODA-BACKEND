@@ -96,26 +96,27 @@ exports.actualizarProducto = async (req, res) => {
 
     const actualizaciones = { ...req.body };
 
-    // Convertimos las tallas de string JSON a array de objetos
+    // Tallas
     if (req.body.tallas && typeof req.body.tallas === 'string') {
       try {
         actualizaciones.tallas = JSON.parse(req.body.tallas);
       } catch (e) {
-        // Si falla el JSON, intentamos el formato viejo "S,M,L"
         actualizaciones.tallas = req.body.tallas.split(',')
           .filter(t => t.trim() !== '')
           .map(t => ({ talla: t.trim(), stock: 1 }));
       }
     }
 
-    // Si mandaron imágenes nuevas las actualizamos
+    // Imágenes nuevas
     if (req.files && req.files.length > 0) {
       actualizaciones.imagenes = req.files.map(file => file.path);
     }
 
+    console.log('Actualizaciones:', actualizaciones); // 👈 para verificar
+
     producto = await Producto.findByIdAndUpdate(
       req.params.id,
-      actualizaciones,
+      { $set: actualizaciones }, // 👈 usa $set para no borrar campos existentes
       { new: true }
     );
 

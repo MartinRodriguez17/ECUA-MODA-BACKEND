@@ -65,6 +65,27 @@ exports.crearPedido = async (req, res) => {
       comprobantePagoUrl: urlComprobante
     });
 
+    // --- VERIFICAR QUE EL CLIENTE NO ESTÉ BLOQUEADO ---
+    const Usuario = require('../models/Usuario');
+    const clienteLogueado = await Usuario.findOne({ email: correoComprador.toLowerCase() });
+
+    if (clienteLogueado) {
+      if (clienteLogueado.estadoCuenta === 'bloqueado') {
+        return res.status(403).json({
+          msg: 'Tu cuenta está bloqueada. No puedes realizar compras 🔒'
+        });
+      }
+      if (clienteLogueado.estadoCuenta === 'suspendido') {
+        return res.status(403).json({
+          msg: 'Tu cuenta está suspendida. No puedes realizar compras 🔴'
+        });
+      }
+      if (clienteLogueado.estadoCuenta === 'baneado') {
+        return res.status(403).json({
+          msg: 'Tu cuenta ha sido eliminada 🚫'
+        });
+      }
+    }
     await pedido.save();
 
     // 3. Reducimos el stock DESPUÉS de guardar
@@ -84,7 +105,7 @@ exports.crearPedido = async (req, res) => {
 }
 
 exports.obtenerMisPedidos = async (req, res) => {
-   try {
+  try {
     const Usuario = require("../models/Usuario");
     const usuarioLogueado = await Usuario.findById(req.usuario.id);
     if (!usuarioLogueado) {
@@ -185,6 +206,8 @@ exports.obtenerVentasMarca = async (req, res) => {
           fechaCreacion: pedido.fechaCreacion,
           correoComprador: pedido.correoComprador,
           direccionEnvio: pedido.direccionEnvio,
+          telefonoComprador: pedido.telefonoComprador, 
+          comprobantePagoUrl: pedido.comprobantePagoUrl,
           productos: misItems,
           total: misItems.reduce((sum, item) => sum + (item.precio * item.cantidad), 0),
         };

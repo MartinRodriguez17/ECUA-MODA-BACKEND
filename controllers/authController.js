@@ -12,7 +12,7 @@ const { enviarCorreoOTP, enviarCorreoSancion, enviarCorreoAceptacionMarca } = re
 exports.generarOtpUsuario = async (req, res) => {
   try {
     const email = req.body.email?.trim().toLowerCase();
-    const nombre = req.body.nombre?.trim(); 
+    const nombre = req.body.nombre?.trim();
 
     if (!email) return res.status(400).json({ msg: "Falta el correo bro" });
 
@@ -25,7 +25,7 @@ exports.generarOtpUsuario = async (req, res) => {
     if (marcaExistente) {
       return res.status(400).json({ msg: "Este correo ya está registrado como vendedor bro 🛑" });
     }
-    
+
     if (nombre) {
       const usernameRepetido = await Usuario.findOne({ nombre: new RegExp(`^${nombre}$`, 'i') });
       if (usernameRepetido) {
@@ -143,19 +143,22 @@ exports.loginUsuario = async (req, res) => {
     }
 
     // --- ESCUDO DE SUSPENSIÓN Y BANEO (MOVIDO AQUÍ ADENTRO ANTES DEL TOKEN) ---
-    if (usuario.estadoCuenta === 'suspendido' && usuario.suspendidoHasta) {
-      // Si ya pasó la fecha de suspensión, lo volvemos a activar automáticamente
-      if (new Date() > new Date(usuario.suspendidoHasta)) {
-        if (esMarca) {
-          await Marca.findByIdAndUpdate(usuario._id, { estadoCuenta: 'activo', suspendidoHasta: null });
+    if (usuario && !esMarca) {
+      // Verificar si la suspensión expiró
+      if (usuario.estadoCuenta === 'suspendido' && usuario.suspendidoHasta) {
+        if (new Date() > new Date(usuario.suspendidoHasta)) {
+          await Usuario.findByIdAndUpdate(usuario._id, {
+            estadoCuenta: 'activo',
+            suspendidoHasta: null
+          });
         } else {
-          await Usuario.findByIdAndUpdate(usuario._id, { estadoCuenta: 'activo', suspendidoHasta: null });
+          const diasRestantes = Math.ceil(
+            (new Date(usuario.suspendidoHasta) - new Date()) / (1000 * 60 * 60 * 24)
+          );
+          return res.status(403).json({
+            msg: `Tu cuenta está suspendida. Quedan ${diasRestantes} día(s) para que se reactive 🔴`
+          });
         }
-        usuario.estadoCuenta = 'activo';
-      } else {
-        // Si sigue suspendido, bloqueamos el paso
-        const diasRestantes = Math.ceil((new Date(usuario.suspendidoHasta) - new Date()) / (1000 * 60 * 60 * 24));
-        return res.status(403).json({ msg: `Tu cuenta está suspendida. Quedan ${diasRestantes} día(s) 🛑` });
       }
     }
 
@@ -169,7 +172,7 @@ exports.loginUsuario = async (req, res) => {
     const payload = {
       usuario: {
         id: usuario.id,
-        rol: esMarca ? "marca" : usuario.rol, 
+        rol: esMarca ? "marca" : usuario.rol,
       },
     };
 
@@ -390,6 +393,23 @@ exports.cambiarEstadoUsuario = async (req, res) => {
     const { estado, motivo, dias } = req.body;
     const { id, tipo } = req.params;
 
+    if (estado === 'activo') {
+      if (tipo === 'marca') {
+        await Marca.findByIdAndUpdate(id, {
+          estadoCuenta: 'activo',
+          estadoAprobacion: 'Aceptada',
+          suspendidoHasta: null,
+          motivoEstado: ''
+        });
+      } else {
+        await Usuario.findByIdAndUpdate(id, {
+          estadoCuenta: 'activo',
+          suspendidoHasta: null,
+          motivoEstado: ''
+        });
+      }
+      return res.json({ msg: 'Cuenta reactivada con éxito ✅' });
+    }
     if (!motivo) {
       return res.status(400).json({ msg: 'Debes ingresar un motivo 🛑' });
     }
