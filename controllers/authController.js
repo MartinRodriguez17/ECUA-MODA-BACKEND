@@ -418,7 +418,14 @@ exports.cambiarEstadoUsuario = async (req, res) => {
       const marca = await Marca.findById(id);
       if (!marca) return res.status(404).json({ msg: 'Marca no encontrada' });
 
-      const actualizaciones = { estadoCuenta: estado, motivoEstado: motivo };
+      const actualizaciones = {
+        estadoCuenta: estado,
+        motivoEstado: motivo,
+        estadoAprobacion: estado === 'activo' ? 'Aceptada' :
+          estado === 'bloqueado' ? 'Bloqueada' :
+            estado === 'suspendido' ? 'Suspendida' :
+              'Rechazada'
+      };
 
       if (estado === 'suspendido') {
         if (!dias || dias < 1 || dias > 30) {

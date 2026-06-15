@@ -8,6 +8,10 @@ const Pedido = require('../models/Pedido');
 const Producto = require('../models/Producto');
 // Importamos Cloudinary para manejar las imágenes de los productos (si es necesario)
 const cloudinary = require("cloudinary").v2;
+// Configuramos Cloudinary con nuestras credenciales (asegúrate de tenerlas en tu .env)
+const Marca = require('../models/Marca');
+// Importamos el modelo de Usuario para verificar el estado de la cuenta del cliente que hace el pedido
+const Usuario = require('../models/Usuario');
 // Importamos las funciones para enviar correos relacionados con los pedidos
 const {
   enviarCorreoAprobacion,
@@ -151,6 +155,16 @@ exports.obtenerTodosLosPedidos = async (req, res) => {
 // --- NUEVA FUNCIÓN (ADMIN): ACTUALIZAR EL ESTADO DEL PEDIDO ---
 exports.actualizarEstadoPedido = async (req, res) => {
   try {
+    const marca = await Marca.findById(req.usuario.id);
+    if (marca) {
+      if (marca.estadoCuenta === 'bloqueado' || marca.estadoAprobacion === 'Bloqueada') {
+        return res.status(403).json({ msg: 'Tu cuenta está bloqueada, no puedes gestionar pedidos 🔒' });
+      }
+      if (marca.estadoCuenta === 'suspendido' || marca.estadoAprobacion === 'Suspendida') {
+        return res.status(403).json({ msg: 'Tu cuenta está suspendida, no puedes gestionar pedidos 🔴' });
+      }
+    }
+
     const { estado, motivoRechazo, numeroRastreo } = req.body;
     const pedidoId = req.params.id;
 
@@ -165,7 +179,7 @@ exports.actualizarEstadoPedido = async (req, res) => {
       fotoEnvioUrl = req.file.path;
     }
 
-    await Pedido.findByIdAndUpdate(pedidoId, { estado }, { new: true });
+    await Pedido.findByIdAndUpdate(pedidoId, { estado }, { returnDocument: 'after' });
 
     // Enviamos correo según el estado
     if (estado === 'Aprobado') {
