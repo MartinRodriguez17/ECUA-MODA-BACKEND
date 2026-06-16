@@ -283,48 +283,115 @@ exports.actualizarPerfil = async (req, res) => {
 // --- OTP RECUPERACIÓN ---
 exports.generarOtpRecuperacion = async (req, res) => {
   try {
-    const email = req.body.email?.trim().toLowerCase();
-    if (!email) return res.status(400).json({ msg: "Falta el correo bro" });
+    const correo = req.body.correo?.trim().toLowerCase();
+    const ruc = req.body.ruc?.trim();
 
-    const usuario = await Usuario.findOne({ email });
-    if (!usuario) {
-      return res.status(404).json({ msg: "No existe una cuenta con ese correo" });
+    if (!correo || !ruc) {
+      return res.status(400).json({ msg: 'Falta el correo o el RUC bro 🛑' });
+    }
+
+    // Verificar que exista la marca con ese correo Y ese RUC
+    const marca = await Marca.findOne({ correo, ruc });
+    if (!marca) {
+      return res.status(404).json({ msg: 'No encontramos una marca con ese correo y RUC 🛑' });
     }
 
     const codigoGenerado = Math.floor(100000 + Math.random() * 900000).toString();
-
-    await Otp.deleteMany({ correo: email });
-    const nuevoOtp = new Otp({ correo: email, codigo: codigoGenerado });
+    await Otp.deleteMany({ correo });
+    const nuevoOtp = new Otp({ correo, codigo: codigoGenerado });
     await nuevoOtp.save();
+    await enviarCorreoOTP(correo, codigoGenerado);
 
-    await enviarCorreoOTP(email, codigoGenerado);
-    res.status(200).json({ msg: "Código enviado al correo 🚀" });
-
+    res.status(200).json({ msg: 'Código enviado al correo 🚀' });
   } catch (error) {
-    console.error("Error OTP Recuperación:", error);
-    res.status(500).send("Hubo un error al generar el código");
+    console.error('Error OTP marca:', error);
+    res.status(500).send('Error al generar el código');
   }
 };
 
 // --- RESTABLECER PASSWORD ---
 exports.restablecerPassword = async (req, res) => {
   try {
-    const { email, codigoOtp, nuevaPassword } = req.body;
+    const { correo, codigoOtp, nuevaPassword } = req.body;
 
-    if (!email || !codigoOtp || !nuevaPassword) {
-      return res.status(400).json({ msg: "Faltan datos bro 🛑" });
+    if (!correo || !codigoOtp || !nuevaPassword) {
+      return res.status(400).json({ msg: 'Faltan datos bro 🛑' });
     }
 
     const passwordRegex = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
     if (!passwordRegex.test(nuevaPassword)) {
       return res.status(400).json({
-        msg: "La contraseña debe tener al menos 8 caracteres, una mayúscula y un número 🛑",
+        msg: 'La contraseña debe tener al menos 8 caracteres, una mayúscula y un número 🛑',
       });
     }
 
-    const otpGuardado = await Otp.findOne({ correo: email.toLowerCase(), codigo: codigoOtp });
+    const otpGuardado = await Otp.findOne({ correo: correo.toLowerCase(), codigo: codigoOtp });
     if (!otpGuardado) {
-      return res.status(400).json({ msg: "Código incorrecto o ya expiró (duraba 5 min) ⏳" });
+      return res.status(400).json({ msg: 'Código incorrecto o ya expiró ⏳' });
+    }
+
+    await Otp.deleteOne({ _id: otpGuardado._id });
+    const salt = await bcrypt.genSalt(10);
+    const passwordEncriptada = await bcrypt.hash(nuevaPassword, salt);
+
+    await Marca.findOneAndUpdate(
+      { correo: correo.toLowerCase() },
+      { password: passwordEncriptada }
+    );
+
+    res.status(200).json({ msg: '¡Contraseña actualizada con éxito! 🎉' });
+  } catch (error) {
+    console.error('Error restablecer marca:', error);
+    res.status(500).send('Error al restablecer la contraseña');
+  }
+};
+// --- OTP RECUPERACIÓN MARCA ---
+exports.generarOtpRecuperacionMarca = async (req, res) => {
+  try {
+    const correo = req.body.correo?.trim().toLowerCase();
+    const ruc = req.body.ruc?.trim();
+
+    if (!correo || !ruc) {
+      return res.status(400).json({ msg: 'Falta el correo o el RUC bro 🛑' });
+    }
+
+    // Verificar que exista la marca con ese correo Y ese RUC
+    const marca = await Marca.findOne({ correo, ruc });
+    if (!marca) {
+      return res.status(404).json({ msg: 'No encontramos una marca con ese correo y RUC 🛑' });
+    }
+
+    const codigoGenerado = Math.floor(100000 + Math.random() * 900000).toString();
+    await Otp.deleteMany({ correo });
+    const nuevoOtp = new Otp({ correo, codigo: codigoGenerado });
+    await nuevoOtp.save();
+    await enviarCorreoOTP(correo, codigoGenerado);
+
+    res.status(200).json({ msg: 'Código enviado al correo 🚀' });
+  } catch (error) {
+    console.error('Error OTP marca:', error);
+    res.status(500).send('Error al generar el código');
+  }
+};
+// --- RESTABLECER PASSWORD MARCA ---
+exports.restablecerPasswordMarca = async (req, res) => {
+  try {
+    const { correo, codigoOtp, nuevaPassword } = req.body;
+
+    if (!correo || !codigoOtp || !nuevaPassword) {
+      return res.status(400).json({ msg: 'Faltan datos bro 🛑' });
+    }
+
+    const passwordRegex = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
+    if (!passwordRegex.test(nuevaPassword)) {
+      return res.status(400).json({
+        msg: 'La contraseña debe tener al menos 8 caracteres, una mayúscula y un número 🛑',
+      });
+    }
+
+    const otpGuardado = await Otp.findOne({ correo: correo.toLowerCase(), codigo: codigoOtp });
+    if (!otpGuardado) {
+      return res.status(400).json({ msg: 'Código incorrecto o ya expiró ⏳' });
     }
 
     await Otp.deleteOne({ _id: otpGuardado._id });
@@ -332,16 +399,15 @@ exports.restablecerPassword = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const passwordEncriptada = await bcrypt.hash(nuevaPassword, salt);
 
-    await Usuario.findOneAndUpdate(
-      { email: email.toLowerCase() },
+    await Marca.findOneAndUpdate(
+      { correo: correo.toLowerCase() },
       { password: passwordEncriptada }
     );
 
-    res.status(200).json({ msg: "¡Contraseña actualizada con éxito! 🎉" });
-
+    res.status(200).json({ msg: '¡Contraseña actualizada con éxito! 🎉' });
   } catch (error) {
-    console.error("Error al restablecer password:", error);
-    res.status(500).send("Hubo un error al restablecer la contraseña");
+    console.error('Error restablecer marca:', error);
+    res.status(500).send('Error al restablecer la contraseña');
   }
 };
 

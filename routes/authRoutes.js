@@ -31,11 +31,15 @@ router.put('/perfil', auth.verificarToken, upload.single('fotoPerfil'), authCont
 // --- RUTAS PARA RECUPERAR CONTRASEÑA ---
 const { 
   generarOtpRecuperacion, 
-  restablecerPassword 
+  restablecerPassword,
+  generarOtpRecuperacionMarca,
+  restablecerPasswordMarca
 } = require('../controllers/authController');
 
 router.post('/recuperar-password', generarOtpRecuperacion);
 router.post('/restablecer-password', restablecerPassword);
+router.post('/recuperar-password-marca', authController.generarOtpRecuperacionMarca);
+router.post('/restablecer-password-marca', authController.restablecerPasswordMarca);
 
 // RUTA PARA LOGIN DE ADMIN
 router.post('/login-admin', authController.loginAdmin);
@@ -46,6 +50,4 @@ router.put('/admin/usuarios/:tipo/:id/estado', auth.verificarToken, authControll
 
 router.put('/admin/marcas/:id/aceptar', auth.verificarToken, authController.aceptarMarca);
 //| RUTA PARA OBTENER TODOS LOS USUARIOS (SOLO PARA ADMIN)
-module.exports = router;
-
 module.exports = router;
